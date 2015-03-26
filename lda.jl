@@ -43,7 +43,7 @@ function sampleTopic(ndk, nkw, nk, document, word, K, W, alpha, beta)
 	for k = 2:K 
 		p[k] = p[k-1] + (ndk[document, k] + alpha) * ((nkw[k, word] + beta)/(nk[k] + (W * beta)))
 	end
-	u = rand(0:maximum(p))
+	u = p[K]*rand()
 	for topic in 1:K
 		if u < p[topic]
 			return topic
