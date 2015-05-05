@@ -12,8 +12,8 @@ name | help
 -----| ----
 corpus | Path to corpus file
 
-named argum
-ents:
+named arguments:
+
 name | help
 ---- | ----
 -k, --num_topics |  The number of topics (type: Int64)
