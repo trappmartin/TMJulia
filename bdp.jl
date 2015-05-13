@@ -47,14 +47,6 @@ function sampletopicindex(nk, nwz, w1, w2, W, K, tau, alpha, beta)
             return k
 		end
     end
-    println("Didn't catch u")
-    println((nk[1] + tau[1] * alpha))
-    println(((nwz[w1, 1] + beta) * (nwz[w2, 1] + beta)))
-    println(nwz[w1, :])
-    println(nwz[w2, :])
-    
-    println(u)
-    println(p)
 end
 
 function initialize(dictionary, biterms, W, Kmax, alpha, beta, gamma)
@@ -236,3 +228,6 @@ println("Running BTM with the following settings:\n$parsed_args")
 (topics, nk, nwz, K, Kmax, U1, U0, tau) = initialize(dictionary, biterms, length(dictionary), parsed_args["iterations"], parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"])
 (topics, nk, nwz, K, Kmax, U1, U0, tau) = gibbs(biterms, topics, nk, nwz, length(dictionary), K, Kmax, U1, U0, tau, parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"], parsed_args["iterations"])
 printTopics(estimatePhi(nwz', nk, parsed_args["beta"], dictionary), dictionary, 10, K)
+
+
+
