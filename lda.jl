@@ -19,7 +19,7 @@ function parseCorpus(dpath, cpath)
 	dictionary, corpus
 end
 
-function initTopics(dictionary, corpus, K)
+function initialize(dictionary, corpus, K)
 	topics = deepcopy(corpus)
 	ndk = zeros(Int64, length(topics), K)
 	nkw = zeros(Int64, K, length(dictionary))
@@ -73,7 +73,6 @@ function gibbs(dictionary, corpus, topics, ndk, nkw, nk, K, alpha, beta, iterati
 			end
 		end
 	end
-	topics, ndk, nkw, nk
 end
 
 function estimateTheta(ndk, alpha, K)
@@ -132,7 +131,7 @@ end
 parsed_args = parse_args(s)
 println("Running LDA with the following settings:\n$parsed_args")
 (dictionary, corpus) = parseCorpus(parsed_args["dictionary"], parsed_args["corpus"])
-Z, ndk, nkw, nk = gibbs(dictionary, corpus, initTopics(dictionary, corpus, parsed_args["num_topics"])..., parsed_args["num_topics"], parsed_args["alpha"], parsed_args["beta"], parsed_args["iterations"])
+(Z, ndk, nkw, nk) = initialize(dictionary, corpus, parsed_args["num_topics"])
+gibbs(dictionary, corpus, Z, ndk, nkw, nk, parsed_args["num_topics"], parsed_args["alpha"], parsed_args["beta"], parsed_args["iterations"])
 
 printTopics(estimatePhi(nkw, nk, parsed_args["beta"], dictionary), dictionary, 10, parsed_args["num_topics"])
-
