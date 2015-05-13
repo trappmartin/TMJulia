@@ -1,6 +1,6 @@
 using Distributions
 
-function parsecorpus(dpath, cpath)
+function parseCorpus(dpath, cpath)
 	dfile = open(dpath, "r")
 	cfile = open(cpath, "r")
 
@@ -37,7 +37,7 @@ function sampletopicindex(ndk, nd, nkw, nk, d, word, W, K, tau, alpha, beta)
 	u = p[K+1]*rand()
 	for k in 1:K+1
 		if u < p[k]
-			return k
+            return k
 		end
 	end
 end
@@ -55,7 +55,7 @@ function initialize(dictionary, corpus, W, Kmax, alpha, beta, gamma)
 	for (d, doc) in enumerate(corpus)
 		for (w, word) in enumerate(doc)
 			k = sampletopicindex(ndk, nd, nkw, nk, d, word, W, K, tau, alpha, beta)
-			topics[d][w] = k
+			
 
 			if k > K
 				try
@@ -65,7 +65,7 @@ function initialize(dictionary, corpus, W, Kmax, alpha, beta, gamma)
 					Kmax *= 2
 					_k = shift!(U0)
 				end
-
+                topics[d][w] = _k
 				push!(U1, _k)
 				if _k == K + 1
 
@@ -88,17 +88,18 @@ function initialize(dictionary, corpus, W, Kmax, alpha, beta, gamma)
 				end
 				K += 1
 			else
-				_k = U1[k]
+                _k = U1[k]
+                topics[d][w] = _k
 				ndk[d, _k] += 1
 				nd[d] += 1
 				nkw[_k, word] += 1
 				nk[_k] += 1
 			end
 
-			ndk[d, k] += 1
-			nd[d] += 1
-			nkw[k, word] += 1
-			nk[k] += 1
+#			ndk[d, k] += 1
+#			nd[d] += 1
+#			nkw[k, word] += 1
+#			nk[k] += 1
 		end
 	end
 
@@ -171,9 +172,68 @@ function gibbs(corpus, topics, ndk, nd, nkw, nk, W, K, Kmax, U1, U0, tau, alpha,
 			end
 		end 
 		tau = rand(Dirichlet(vec([nk .+ beta, gamma])), 1)
-	end
+    end
+    topics, ndk, nd, nkw, nk, K, Kmax, U1, U0, tau
 end
-(dictionary, corpus) = parsecorpus("data/vocab.txt", "data/ap.dat")
-	
-(topics, ndk, nd, nkw, nk, K, Kmax, U1, U0, tau) = initialize(dictionary, corpus, length(dictionary), 100, 1, 0.001, 10)
-gibbs(corpus, topics, ndk, nd, nkw, nk, length(dictionary), K, Kmax, U1, U0, tau, 1, 0.001, 10, 100)
+
+function estimateTheta(ndk, alpha, K)
+	thetadk = Array(Float64, size(ndk)...)
+	for d in 1:size(thetadk, 1)
+		for k in 1:size(thetadk, 2)
+			thetadk[d,k] = (ndk[d,k] + alpha) / (sum(ndk, 2)[d] + (K * alpha))
+		end
+	end
+	thetadk
+end
+
+function estimatePhi(nkw, nk, beta, dictionary)
+	phikw = Array(Float64, size(nkw)...)
+	for k in 1:size(phikw, 1)
+		for w in 1:size(phikw, 2)
+			phikw[k,w] = (nkw[k,w] + beta)/(nk[k] + (length(dictionary) * beta))
+		end
+	end
+	phikw
+end
+
+function printTopics(phi, dictionary, nwords, K)
+    for k = 1:K
+        topic = hcat(phi'[:,k], dictionary)
+        println("Topic $k:\n $(sortrows(topic, rev=true, by=x->(x[1]))[1:nwords,:])")
+    end
+end
+
+using ArgParse
+s = ArgParseSettings()
+@add_arg_table s begin
+    "--alpha", "-a"
+    help = "The alpha hyperparameter"
+    arg_type = Number
+    default = 1
+    "--beta", "-b"
+    help = "The beta hyperparameter"
+    arg_type = Number
+    default = 0.01
+    "--gamma", "-g"
+    help = "The gamma hyperparameter"
+    arg_type = Number
+    default = 1
+    "--iterations", "-i"
+    help = "The number of iterations"
+    arg_type = Int
+    required = true
+    "--dictionary", "-d"
+    help = "Path to vocabulary file"
+    "corpus"
+    help = "Path to corpus file"
+    required = true
+end
+
+parsed_args = parse_args(s)
+println("Running HDP with the following settings:\n$parsed_args")
+(dictionary, corpus) = parseCorpus(parsed_args["dictionary"], parsed_args["corpus"])
+
+(topics, ndk, nd, nkw, nk, K, Kmax, U1, U0, tau) = initialize(dictionary, corpus, length(dictionary), parsed_args["iterations"], parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"])
+(topics, ndk, nd, nkw, nk, K, Kmax, U1, U0, tau) = gibbs(corpus, topics, ndk, nd, nkw, nk, length(dictionary), K, Kmax, U1, U0, tau, parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"], parsed_args["iterations"])
+
+printTopics(estimatePhi(nkw, nk, parsed_args["beta"], dictionary), dictionary, 10, K)
