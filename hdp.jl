@@ -56,6 +56,7 @@ function initialize(dictionary, corpus, W, Kmax, alpha, beta, gamma)
 		    for (w, word) in enumerate(doc)
 			      k = sampletopicindex(ndk, nd, nkw, nk, d, word, W, K, tau, alpha, beta)
 
+
 			      if k > K
 				        try
 					          _k = shift!(U0)
