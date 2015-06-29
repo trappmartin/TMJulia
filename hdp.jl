@@ -103,8 +103,11 @@ function initialize(dictionary, corpus, W, Kmax, alpha, beta, gamma)
 end
 
 function gibbs(corpus, topics, ndk, nd, nkw, nk, W, K, Kmax, U1, U0, tau, alpha, beta, gamma, iterations)
+	KOverTime = Int64[]
 	  for n in 1:iterations
+		push!(KOverTime, K)
 		    println("Iteration $n")
+			println(length(KOverTime))
         println(nk)
         println(K)
 		    for (d, doc) in enumerate(corpus)
@@ -182,7 +185,7 @@ function gibbs(corpus, topics, ndk, nd, nkw, nk, W, K, Kmax, U1, U0, tau, alpha,
 		    end 
 		    tau = rand(Dirichlet(vec([nk .+ beta, gamma])), 1)
     end
-    topics, ndk, nd, nkw, nk, K, Kmax, U1, U0, tau
+    topics, ndk, nd, nkw, nk, K, Kmax, U1, U0, tau, KOverTime
 end
 
 function estimateTheta(ndk, alpha, K)
@@ -228,12 +231,14 @@ function printTopics(phi, dictionary, nwords, K)
     end
 end
 
+using HDF5, JLD
+
 (dictionary, corpus) = parseCorpus("data/reuters_vocab.dat", "data/reuters_train.dat")
-for gamma=1:5:100
+for gamma=0:5:100
     println("Running HDP for gamma=", gamma)
-    (topics, ndk, nd, nkw, nk, K, Kmax, U1, U0, tau) = initialize(dictionary, corpus, length(dictionary), 1000, 1, 0.1, gamma)
-    (topics, ndk, nd, nkw, nk, K, Kmax, U1, U0, tau) = gibbs(corpus, topics, ndk, nd, nkw, nk, length(dictionary), K, Kmax, U1, U0, tau, 1, 0.1, gamma, 1000)
-    save(string("models/hdp/hdp_1_01_",gamma), "Z", topics, "ndk", ndk, "nd", nd, "nkw", nkw, "nk", nk)
+    (topics, ndk, nd, nkw, nk, K, Kmax, U1, U0, tau) = initialize(dictionary, corpus, length(dictionary), 1000, 1, 0.1, max(gamma, 1))
+    (topics, ndk, nd, nkw, nk, K, Kmax, U1, U0, tau, KOverTime) = gibbs(corpus, topics, ndk, nd, nkw, nk, length(dictionary), K, Kmax, U1, U0, tau, 1, 0.1, max(gamma, 1), 1000)
+    save(string("models/hdp/hdp_1_01_",gamma), "Z", topics, "ndk", ndk, "nd", nd, "nkw", nkw, "nk", nk, "k_over_time", KOverTime)
 end
 
 
