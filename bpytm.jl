@@ -1,31 +1,31 @@
 using Distributions
 
 function parseCorpus(dpath, cpath, window)
-	dfile = open(dpath, "r")
-	cfile = open(cpath, "r")
+	  dfile = open(dpath, "r")
+	  cfile = open(cpath, "r")
 
-	dictionary = map(chomp, readlines(dfile))
+	  dictionary = map(chomp, readlines(dfile))
 
-	biterms = Array((Int64, Int64), 0)
-	for (i, line) in enumerate(eachline(cfile))
-		line = split(line)
-		document = Int64[]
-		for wordcount in line
-			(word, count) = split(wordcount, ":")
-			for _ in 1:parseint(count)
-				push!(document, parseint(word) + 1)
-			end
-		end
-		for i in 1:window:length(document)-1
-			for j in i:min(i+(window-2),length(document)-1)
-				for k in j+1:min(i+(window-1), length(document))
-					push!(biterms, (document[j], document[k]))
-				end
-			end
-		end
-	end
-	println(length(biterms), " biterms")
-	dictionary, biterms
+	  biterms = Array((Int64, Int64), 0)
+	  for (i, line) in enumerate(eachline(cfile))
+		    line = split(line)
+		    document = Int64[]
+		    for wordcount in line
+			      (word, count) = split(wordcount, ":")
+			      for _ in 1:parseint(count)
+				        push!(document, parseint(word) + 1)
+			      end
+		    end
+		    for i in 1:window:length(document)-1
+			      for j in i:min(i+(window-2),length(document)-1)
+				        for k in j+1:min(i+(window-1), length(document))
+					          push!(biterms, (document[j], document[k]))
+				        end
+			      end
+		    end
+	  end
+	  println(length(biterms), " biterms")
+	  dictionary, biterms
 end
 
 function sampletopicindex(nk, nwz, w1, w2, W, K, tau, alpha, beta, delta)
@@ -35,41 +35,31 @@ function sampletopicindex(nk, nwz, w1, w2, W, K, tau, alpha, beta, delta)
     p = zeros(K+1)
 
     p[1] = (nk[1] + tau[1] * alpha) * (max(nwz[w1, 1] - delta, 0) + beta) * (max(nwz[w2, 1] - delta, 0) + beta) / ((2 * nk[1] + W * beta) * (2 * nk[1] + (W + 1) * beta))
-	for k = 2:K 
-		p[k] = p[k-1] + (nk[k] + tau[k] * alpha) * (max(nwz[w1, k] - delta, 0) + beta) * (max(nwz[w2, k] - delta, 0) + beta) / ((2 * nk[k] + W * beta) * (2 * nk[k] + (W + 1) * beta))
-	end
+	  for k = 2:K 
+		    p[k] = p[k-1] + (nk[k] + tau[k] * alpha) * (max(nwz[w1, k] - delta, 0) + beta) * (max(nwz[w2, k] - delta, 0) + beta) / ((2 * nk[k] + W * beta) * (2 * nk[k] + (W + 1) * beta))
+	  end
 
     p[K+1] = p[K] + (tau[K+1] * alpha / W)
 
-	u = p[K+1]*rand()
-	for k in 1:K+1
-		if u < p[k]
+	  u = p[K+1]*rand()
+	  for k in 1:K+1
+		    if u < p[k]
             return k
-		end
+		    end
     end
-    println("Didn't catch u")
-    println((nk[1] + tau[1] * alpha))
-    println(((nwz[w1, 1] + beta) * (nwz[w2, 1] + beta)))
-    println(nwz[w1, :])
-    println(nwz[w2, :])
-    
-    println(u)
-    println(p)
 end
 
 function initialize(dictionary, biterms, W, Kmax, alpha, beta, gamma, delta)
     K = 0
-	topics = Array(Int64, length(biterms))
-	nk = zeros(Int64, K)
+	  topics = Array(Int64, length(biterms))
+	  nk = zeros(Int64, K)
     nwz = zeros(Int64, length(dictionary), K)
     U1 = Int64[]
     U0 = [1:Kmax]
     tau = 1
     for (i, biterm) in enumerate(biterms)
-        
         k = sampletopicindex(nk, nwz, biterm[1], biterm[2], W, K, tau, alpha, beta, delta)
         if k > K
-            
             try
                 _k = shift!(U0)
             catch
@@ -86,7 +76,7 @@ function initialize(dictionary, biterms, W, Kmax, alpha, beta, gamma, delta)
                 _nwz = zeros(Int64, W)
                 _nwz[biterm[1]] += 1
                 _nwz[biterm[2]] += 1
-                nwz = [nwz _nwz]                
+                nwz = [nwz _nwz]
                 tau = rand(Dirichlet(vec([nk .+ beta, gamma])), 1)
             else
                 println("$_k (K = $K)")
@@ -97,14 +87,13 @@ function initialize(dictionary, biterms, W, Kmax, alpha, beta, gamma, delta)
             K += 1
         else
             _k = U1[k]
-            topics[i] = _k            
+            topics[i] = _k
             nk[_k] += 1
             nwz[biterm[1], _k] += 1
             nwz[biterm[2], _k] += 1
         end
     end
-    
-	topics, nk, nwz, K, Kmax, U1, U0, tau
+	  topics, nk, nwz, K, Kmax, U1, U0, tau
 end
 
 function gibbs(corpus, topics, nk, nwz, W, K, Kmax, U1, U0, tau, alpha, beta, gamma, delta, iterations)
@@ -114,13 +103,10 @@ function gibbs(corpus, topics, nk, nwz, W, K, Kmax, U1, U0, tau, alpha, beta, ga
             w1 = biterm[1]
             w2 = biterm[2]
             k = topics[i]
-            
             nk[k] -= 1
             nwz[w1, k] -= 1
             nwz[w2, k] -= 1
-            
             k = sampletopicindex(nk, nwz, w1, w2, W, K, tau, alpha, beta, delta)
-            
             if k > K
                 try
                     _k = shift!(U0)
@@ -149,45 +135,54 @@ function gibbs(corpus, topics, nk, nwz, W, K, Kmax, U1, U0, tau, alpha, beta, ga
                 K += 1
             else
                 _k = U1[k]
-                topics[i] = _k            
+                topics[i] = _k
                 nk[_k] += 1
                 nwz[biterm[1], _k] += 1
                 nwz[biterm[2], _k] += 1
             end
         end
-        println("Pruning empty topics")
+
+        # offset to account for variable stack size U1
+        offset = 0
         for k in 1:K
-            if nk[k] == 0
-                println("pruned $k")
-                delete!(U1, k)
-				unshift!(U0, k)
-				nwz[:, k] = 0
-				K -= 1
-			end
-		end 
-		tau = rand(Dirichlet(vec([nk .+ beta, gamma])), 1)
+            if nk[k - offset] == 0
+                deleteat!(U1, k - offset)
+				        unshift!(U0, k)
+				        nwz = [nwz[:, 1:(k - offset - 1)] nwz[:, (k - offset + 1):end]]
+                deleteat!(nk, k - offset)
+				        K -= 1
+                offset += 1
+
+                for i = 1:length(topics)
+                    if topics[i][j] > k - offset
+                        topics [i][j] -= 1
+                    end
+                end
+			      end
+		    end 
+		    tau = rand(Dirichlet(vec([nk .+ beta, gamma])), 1)
     end
     topics, nk, nwz, K, Kmax, U1, U0, tau
 end
 
 function estimateTheta(ndk, alpha, K)
-	thetadk = Array(Float64, size(ndk)...)
-	for d in 1:size(thetadk, 1)
-		for k in 1:size(thetadk, 2)
-			thetadk[d,k] = (ndk[d,k] + alpha) / (sum(ndk, 2)[d] + (K * alpha))
-		end
-	end
-	thetadk
+	  thetadk = Array(Float64, size(ndk)...)
+	  for d in 1:size(thetadk, 1)
+		    for k in 1:size(thetadk, 2)
+			      thetadk[d,k] = (ndk[d,k] + alpha) / (sum(ndk, 2)[d] + (K * alpha))
+		    end
+	  end
+	  thetadk
 end
 
 function estimatePhi(nkw, nk, beta, dictionary)
     phikw = Array(Float64, size(nkw)...)
-	for k in 1:size(phikw, 1)
-		for w in 1:size(phikw, 2)
-			phikw[k,w] = (nkw[k,w] + beta)/(nk[k] + (length(dictionary) * beta))
-		end
-	end
-	phikw
+	  for k in 1:size(phikw, 1)
+		    for w in 1:size(phikw, 2)
+			      phikw[k,w] = (nkw[k,w] + beta)/(nk[k] + (length(dictionary) * beta))
+		    end
+	  end
+	  phikw
 end
 
 
@@ -237,6 +232,6 @@ end
 parsed_args = parse_args(s)
 println("Running BTM with the following settings:\n$parsed_args")
 (dictionary, biterms) = parseCorpus(parsed_args["dictionary"], parsed_args["corpus"], parsed_args["window"])
-(topics, nk, nwz, K, Kmax, U1, U0, tau) = initialize(dictionary, biterms, length(dictionary), parsed_args["iterations"], parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"], parsed_args["delta"])
-gibbs(biterms, topics, nk, nwz, length(dictionary), K, Kmax, U1, U0, tau, parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"], parsed_args["delta"], parsed_args["iterations"])
+(topics, nk, nwz, K, Kmax, U1, U0, tau) = initialize(dictionary, biterms, length(dictionary), 1000, parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"], parsed_args["delta"])
+(topics, nk, nwz, K, Kmax, U1, U0, tau) = gibbs(biterms, topics, nk, nwz, length(dictionary), K, Kmax, U1, U0, tau, parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"], parsed_args["delta"], parsed_args["iterations"])
 printTopics(estimatePhi(nwz', nk, parsed_args["beta"], dictionary), dictionary, 10, K)
