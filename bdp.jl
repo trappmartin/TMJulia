@@ -36,7 +36,17 @@ function sampletopicindex(nk, nwz, w1, w2, W, K, tau, alpha, beta)
 
     p[1] = (nk[1] + tau[1] * alpha) * ((nwz[w1, 1] + beta) * (nwz[w2, 1] + beta)) / ((2 * nk[1] + W * beta) * (2 * nk[1] + (W + 1) * beta))
 	for k = 2:K 
+	try
 		p[k] = p[k-1] + (nk[k] + tau[k] * alpha) * ((nwz[w1, k] + beta) * (nwz[w2, k] + beta)) / ((2 * nk[k] + W * beta) * (2 * nk[k] + (W + 1) * beta))
+	catch
+		println(size(p))
+		println(k)
+		println(K)
+		println(size(tau))
+		println(size(nwz))
+		println(size(nk))
+		exit(1)
+	end
 	end
 
     p[K+1] = p[K] + (tau[K+1] * alpha / W)
@@ -58,7 +68,7 @@ function initialize(dictionary, biterms, W, Kmax, alpha, beta, gamma)
     U0 = [1:Kmax]
     tau = 1
     for (i, biterm) in enumerate(biterms)
-        
+
         k = sampletopicindex(nk, nwz, biterm[1], biterm[2], W, K, tau, alpha, beta)
         if k > K
             
@@ -81,13 +91,15 @@ function initialize(dictionary, biterms, W, Kmax, alpha, beta, gamma)
                 nwz = [nwz _nwz]                
                 tau = rand(Dirichlet(vec([nk .+ beta, gamma])), 1)
             else
+
                 println("$_k (K = $K)")
                 nk[_k] += 1
-                nkw[biterm[1], _k] += 1
-                nkw[biterm[2], _k] += 1
+                nwz[biterm[1], _k] += 1
+                nwz[biterm[2], _k] += 1
             end
             K += 1
         else
+
             _k = U1[k]
             topics[i] = _k            
             nk[_k] += 1
@@ -100,9 +112,28 @@ function initialize(dictionary, biterms, W, Kmax, alpha, beta, gamma)
 end
 
 function gibbs(corpus, topics, nk, nwz, W, K, Kmax, U1, U0, tau, alpha, beta, gamma, iterations)
-    for n in 1:iterations
+loop = 0
+    KOverTime = Int64[]
+	for n in 1:iterations
+	try
+		push!(KOverTime, K)
         println("Iteration $n")
+		println(K)
+		println(size(nwz))
+		println(U1)
+		println(U0)
+		println(nk)
         for (i, biterm) in enumerate(biterms)
+				if K > length(nk)
+			print(loop)
+			println(K)
+			println(size(nk))
+			println(size(nwz))
+			println(U1)
+			println(U0[1:10])
+			exit(1)
+		end
+        loop = 0
             w1 = biterm[1]
             w2 = biterm[2]
             k = topics[i]
@@ -114,52 +145,73 @@ function gibbs(corpus, topics, nk, nwz, W, K, Kmax, U1, U0, tau, alpha, beta, ga
             k = sampletopicindex(nk, nwz, w1, w2, W, K, tau, alpha, beta)
             
             if k > K
+			loop = 1
                 try
                     _k = shift!(U0)
                 catch
-                    U0 = [Kmax+1:Kmax*2]
-                    Kmax *= 2
+                    U0 = [K+1:K*2]
                     _k = shift!(U0)
                 end
                 topics[i] = _k
                 push!(U1, _k)
                 if _k == K + 1
+				loop = 2
                     push!(nk, 1)
 
                     _nwz = zeros(Int64, W)
-                    _nwz[biterm[1]] += 1
-                    _nwz[biterm[2]] += 1
+                    _nwz[w1] += 1
+                    _nwz[w2] += 1
 
                     nwz = [nwz _nwz]
 
                     tau = rand(Dirichlet(vec([nk .+ beta, gamma])), 1)
                 else
+				loop = 3
                     nk[_k] += 1
-                    nkw[biterm[1], _k] += 1
-                    nkw[biterm[2], _k] += 1
+                    nwz[w1, _k] += 1
+                    nwz[w2, _k] += 1
                 end
                 K += 1
             else
+			loop = 4
                 _k = U1[k]
                 topics[i] = _k            
                 nk[_k] += 1
-                nwz[biterm[1], _k] += 1
-                nwz[biterm[2], _k] += 1
+                nwz[w1, _k] += 1
+                nwz[w2, _k] += 1
             end
         end
         println("Pruning empty topics")
+		offset = 0
         for k in 1:K
-            if nk[k] == 0
-                println("pruned $k")
-                delete!(U1, k)
+            if nk[k - offset] == 0
+                deleteat!(U1, k - offset)
+				U1[k - offset:end] -= 1
 				unshift!(U0, k)
-				nwz[:, k] = 0
+				nwz = [nwz[:, 1:(k - offset - 1)] nwz[:, (k - offset + 1):end]]
+				deleteat!(nk, k - offset)
 				K -= 1
+				offset += 1
+				for i = 1:length(topics)
+                        if topics[i] > k - offset
+                            topics[i] -= 1
+                    end
+                end
 			end
-		end 
+		end
+		U0 = [K+1:K+100]
 		tau = rand(Dirichlet(vec([nk .+ beta, gamma])), 1)
+		catch
+			println(K)
+			println(size(nk))
+			println(size(nwz))
+			println(U1)
+			println(U0[1:10])
+						print(loop)
+			exit(1)
+		end
     end
-    topics, nk, nwz, K, Kmax, U1, U0, tau
+    topics, nk, nwz, K, Kmax, U1, U0, tau, KOverTime
 end
 
 function estimateTheta(ndk, alpha, K)
@@ -192,42 +244,52 @@ function printTopics(phi, dictionary, nwords, K)
     end
 end
 
-using ArgParse
-s = ArgParseSettings()
-@add_arg_table s begin
-    "--alpha", "-a"
-    help = "The alpha hyperparameter"
-    arg_type = Number
-    default = 1
-    "--beta", "-b"
-    help = "The beta hyperparameter"
-    arg_type = Number
-    default = 0.01
-    "--gamma", "-g"
-    help = "The gamma hyperparameter"
-    arg_type = Number
-    default = 1
-    "--iterations", "-i"
-    help = "The number of iterations"
-    arg_type = Int
-    required = true
-    "--dictionary", "-d"
-    help = "Path to vocabulary file"
-    "corpus"
-    help = "Path to corpus file"
-    required = true
-    "--window", "-w"
-    help = "The context window in which co-occurrences are considered"
-    arg_type = Int
-    default = 15
+using HDF5, JLD
+
+(dictionary, biterms) = parseCorpus("data/reuters_vocab.dat", "data/reuters_train.dat", 15)
+for gamma=5:5:100
+    println("Running HDP for gamma=", gamma)
+    (topics, nk, nwz, K, Kmax, U1, U0, tau) = initialize(dictionary, biterms, length(dictionary), 1000, 1, 0.1, max(gamma, 1))
+    (topics, nk, nwz, K, Kmax, U1, U0, tau, KOverTime) = gibbs(biterms, topics, nk, nwz, length(dictionary), K, Kmax, U1, U0, tau, 1, 0.1, max(gamma, 1), 1000)
+    save(string("models/bdp/bdp_1_01_",gamma), "Z", topics, "nk", nk, "nwz", nwz, "k_over_time", KOverTime)
 end
 
-parsed_args = parse_args(s)
-println("Running BTM with the following settings:\n$parsed_args")
-(dictionary, biterms) = parseCorpus(parsed_args["dictionary"], parsed_args["corpus"], parsed_args["window"])
-(topics, nk, nwz, K, Kmax, U1, U0, tau) = initialize(dictionary, biterms, length(dictionary), parsed_args["iterations"], parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"])
-(topics, nk, nwz, K, Kmax, U1, U0, tau) = gibbs(biterms, topics, nk, nwz, length(dictionary), K, Kmax, U1, U0, tau, parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"], parsed_args["iterations"])
-printTopics(estimatePhi(nwz', nk, parsed_args["beta"], dictionary), dictionary, 10, K)
+#using ArgParse
+#s = ArgParseSettings()
+#@add_arg_table s begin
+#    "--alpha", "-a"
+#    help = "The alpha hyperparameter"
+#    arg_type = Number
+#    default = 1
+#    "--beta", "-b"
+#    help = "The beta hyperparameter"
+#    arg_type = Number
+#    default = 0.01
+#    "--gamma", "-g"
+#    help = "The gamma hyperparameter"
+#    arg_type = Number
+#    default = 1
+#    "--iterations", "-i"
+#    help = "The number of iterations"
+#    arg_type = Int
+#    required = true
+#    "--dictionary", "-d"
+#    help = "Path to vocabulary file"
+#    "corpus"
+#    help = "Path to corpus file"
+#    required = true
+#    "--window", "-w"
+#    help = "The context window in which co-occurrences are considered"
+#    arg_type = Int
+#    default = 15
+#end
+
+#parsed_args = parse_args(s)
+#println("Running BTM with the following settings:\n$parsed_args")
+#(dictionary, biterms) = parseCorpus(parsed_args["dictionary"], parsed_args["corpus"], parsed_args["window"])
+#(topics, nk, nwz, K, Kmax, U1, U0, tau) = initialize(dictionary, biterms, length(dictionary), parsed_args["iterations"], parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"])
+#(topics, nk, nwz, K, Kmax, U1, U0, tau) = gibbs(biterms, topics, nk, nwz, length(dictionary), K, Kmax, U1, U0, tau, parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"], parsed_args["iterations"])
+#printTopics(estimatePhi(nwz', nk, parsed_args["beta"], dictionary), dictionary, 10, K)
 
 
 
