@@ -214,7 +214,7 @@ end
 using HDF5, JLD
 
 (dictionary, biterms) = parseCorpus("data/reuters_vocab.dat", "data/reuters_train.dat", 15)
-for delta = 0:0.2:0.6
+for delta = 0:0.4:0.6
 	for gamma = 0:10:100
 		if isfile(string("models/bpyp/bpyp_1_01_", max(1, gamma), "_", delta))
 			continue
