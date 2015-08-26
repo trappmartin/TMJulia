@@ -120,7 +120,7 @@ end
 using HDF5, JLD
 
 (dictionary, biterms) = parseCorpus("data/reuters_vocab.dat", "data/reuters_train.dat", 15)
-for K = 130:10:200
+for K = 160:10:200
     println("Running BTM for ", K, " topics")
     (Z, nk, nwz) = initialize(dictionary, biterms, K)
     (Z, nk, nwz) = gibbs(dictionary, biterms, Z, nk, nwz, K, 1, 0.1, 350)

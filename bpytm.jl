@@ -192,7 +192,6 @@ function printTopics(phi, dictionary, nwords, K)
     end
 end
 
-
 using ArgParse
 s = ArgParseSettings()
 @add_arg_table s begin
