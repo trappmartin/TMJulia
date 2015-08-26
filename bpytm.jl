@@ -24,7 +24,6 @@ function parseCorpus(dpath, cpath, window)
 			      end
 		    end
 	  end
-	  println(length(biterms), " biterms")
 	  dictionary, biterms
 end
 
@@ -79,7 +78,6 @@ function initialize(dictionary, biterms, W, Kmax, alpha, beta, gamma, delta)
                 nwz = [nwz _nwz]
                 tau = rand(Dirichlet(vec([nk .+ beta, gamma])), 1)
             else
-                println("$_k (K = $K)")
                 nk[_k] += 1
                 nkw[biterm[1], _k] += 1
                 nkw[biterm[2], _k] += 1
@@ -100,7 +98,6 @@ function gibbs(corpus, topics, nk, nwz, W, K, Kmax, U1, U0, tau, alpha, beta, ga
 	KOverTime = Int64[]
     for n in 1:iterations
 			push!(KOverTime, K)
-			println(K)
         println("Iteration $n")
         for (i, biterm) in enumerate(biterms)
             w1 = biterm[1]
@@ -189,67 +186,50 @@ end
 
 
 function printTopics(phi, dictionary, nwords, K)
-    println(K)
-    print(size(phi))
     for k = 1:K
         topic = hcat(phi'[:,k], dictionary)
         println("Topic $k:\n $(sortrows(topic, rev=true, by=x->(x[1]))[1:nwords,:])")
     end
 end
 
-using HDF5, JLD
 
-(dictionary, biterms) = parseCorpus("data/feelings_vocab.dat", "data/feelings.dat", 15)
-for delta = 0:0.2:1.0
-    gamma = 0
-#	for gamma = 0:0:0
-		if isfile(string("models_feelings/bpyp/bpyp_1_01_", max(1, gamma), "_", delta))
-			continue
-		end
-		println("Running BPYP for gamma=", gamma, ", delta=", delta)
-(topics, nk, nwz, K, Kmax, U1, U0, tau) = initialize(dictionary, biterms, length(dictionary), 1000, 1, 0.1, max(1, gamma), delta)
-(topics, nk, nwz, K, Kmax, U1, U0, tau, KOverTime) = gibbs(biterms, topics, nk, nwz, length(dictionary), K, Kmax, U1, U0, tau, 1, 0.1, max(1, gamma), delta, 350)
-save(string("models_feelings/bpyp/bpyp_1_01_", max(1, gamma), "_", delta), "Z", topics, "nk", nk, "nwz", nwz, "K", K, "k_over_time", KOverTime)
-#	end
+using ArgParse
+s = ArgParseSettings()
+@add_arg_table s begin
+    "--alpha", "-a"
+    help = "The alpha hyperparameter"
+    arg_type = Number
+    default = 1
+    "--beta", "-b"
+    help = "The beta hyperparameter"
+    arg_type = Number
+    default = 0.01
+    "--gamma", "-g"
+    help = "The gamma hyperparameter"
+    arg_type = Number
+    default = 1
+    "--delta", "-d"
+    help = "The delta hyperparameter"
+    arg_type = Number
+    default = 0.001
+    "--iterations", "-i"
+    help = "The number of iterations"
+    arg_type = Int
+    required = true
+    "--dictionary", "-v"
+    help = "Path to vocabulary file"
+    "corpus"
+    help = "Path to corpus file"
+    required = true
+    "--window", "-w"
+    help = "The context window in which co-occurrences are considered"
+    arg_type = Int
+    default = 15
 end
 
-#using ArgParse
-#s = ArgParseSettings()
-#@add_arg_table s begin
-#    "--alpha", "-a"
-#    help = "The alpha hyperparameter"
-#    arg_type = Number
-#    default = 1
-#    "--beta", "-b"
-#    help = "The beta hyperparameter"
-#    arg_type = Number
-#    default = 0.01
-#    "--gamma", "-g"
-#    help = "The gamma hyperparameter"
-#    arg_type = Number
-#    default = 1
-#    "--delta", "-d"
-#    help = "The delta hyperparameter"
-#    arg_type = Number
-#    default = 0.0001
-#    "--iterations", "-i"
-#    help = "The number of iterations"
-#    arg_type = Int
-#    required = true
-#    "--dictionary", "-v"
-#    help = "Path to vocabulary file"
-#    "corpus"
-#    help = "Path to corpus file"
-#    required = true
-#    "--window", "-w"
-#    help = "The context window in which co-occurrences are considered"
-#    arg_type = Int
-#    default = 15
-#end
-
-#parsed_args = parse_args(s)
-#println("Running BTM with the following settings:\n$parsed_args")
-#(dictionary, biterms) = parseCorpus(parsed_args["dictionary"], parsed_args["corpus"], parsed_args["window"])
-#(topics, nk, nwz, K, Kmax, U1, U0, tau) = initialize(dictionary, biterms, length(dictionary), parsed_args["iterations"], parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"], parsed_args["delta"])
-#gibbs(biterms, topics, nk, nwz, length(dictionary), K, Kmax, U1, U0, tau, parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"], parsed_args["delta"], parsed_args["iterations"])
-#printTopics(estimatePhi(nwz', nk, parsed_args["beta"], dictionary), dictionary, 10, K)
+parsed_args = parse_args(s)
+println("Running BTM with the following settings:\n$parsed_args")
+(dictionary, biterms) = parseCorpus(parsed_args["dictionary"], parsed_args["corpus"], parsed_args["window"])
+(topics, nk, nwz, K, Kmax, U1, U0, tau) = initialize(dictionary, biterms, length(dictionary), parsed_args["iterations"], parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"], parsed_args["delta"])
+(topics, nk, nwz, K, Kmax, U1, U0, tau, KOverTime) = gibbs(biterms, topics, nk, nwz, length(dictionary), K, Kmax, U1, U0, tau, parsed_args["alpha"], parsed_args["beta"], parsed_args["gamma"], parsed_args["delta"], parsed_args["iterations"])
+printTopics(estimatePhi(nwz', nk, parsed_args["beta"], dictionary), dictionary, 10, K)
